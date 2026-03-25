@@ -1,6 +1,18 @@
 [submodule "team1-frontend"]
 	path = team1-frontend
 	url = https://github.com/hanhwa-swcamp-22th-final/team1-frontend.git
+[submodule "team1-backend-notification"]
+	path = team1-backend-notification
+	url = https://github.com/hanhwa-swcamp-22th-final/team1-backend-notification.git
+[submodule "team1-backend-integration"]
+	path = team1-backend-integration
+	url = https://github.com/hanhwa-swcamp-22th-final/team1-backend-integration.git
+[submodule "team1-backend-order"]
+	path = team1-backend-order
+	url = https://github.com/hanhwa-swcamp-22th-final/team1-backend-order.git
+[submodule "team1-backend-wms"]
+	path = team1-backend-wms
+	url = https://github.com/hanhwa-swcamp-22th-final/team1-backend-wms.git
 [submodule "team1-backend-member"]
 	path = team1-backend-member
-	url = https://github.com/wjdqudwls/team1-backend-member.git
+	url = https://github.com/hanhwa-swcamp-22th-final/team1-backend-member.git
