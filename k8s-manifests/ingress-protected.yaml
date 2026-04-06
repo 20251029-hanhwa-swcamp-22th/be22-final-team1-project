@@ -21,16 +21,16 @@ spec:
                 name: member-service
                 port:
                   number: 8080
-                  
+
           # Integration Service
-          - path: /integration
+          - path: /integrations
             pathType: Prefix
             backend:
               service:
                 name: integration-service
                 port:
                   number: 8080
-                  
+
           # Notification Service
           - path: /notifications
             pathType: Prefix
@@ -39,7 +39,7 @@ spec:
                 name: notification-service
                 port:
                   number: 8080
-                  
+
           # WMS Service
           - path: /wms
             pathType: Prefix
@@ -48,7 +48,7 @@ spec:
                 name: wms-service
                 port:
                   number: 8080
-                  
+
           # Order Service
           - path: /orders
             pathType: Prefix
