@@ -1,0 +1,59 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-gateway-protected
+  namespace: default
+  annotations:
+    # member-service의 authorization 엔드포인트를 호출하여 인증 수행
+    nginx.ingress.kubernetes.io/auth-url: "http://member-service.default.svc.cluster.local:8080/member/authorization"
+    # 인증 성공 시 응답 헤더에서 추출하여 백엔드 서비스로 전달할 헤더 목록
+    nginx.ingress.kubernetes.io/auth-response-headers: "x-user-id, x-user-name, x-seller-id, x-tenant-id, x-role"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # Member Service (인증 제외 API가 우선 순위(Longest Prefix) 또는 다른 Ingress에 의해 처리됨)
+          - path: /member
+            pathType: Prefix
+            backend:
+              service:
+                name: member-service
+                port:
+                  number: 8080
+                  
+          # Integration Service
+          - path: /integration
+            pathType: Prefix
+            backend:
+              service:
+                name: integration-service
+                port:
+                  number: 8080
+                  
+          # Notification Service
+          - path: /notifications
+            pathType: Prefix
+            backend:
+              service:
+                name: notification-service
+                port:
+                  number: 8080
+                  
+          # WMS Service
+          - path: /wms
+            pathType: Prefix
+            backend:
+              service:
+                name: wms-service
+                port:
+                  number: 8080
+                  
+          # Order Service
+          - path: /orders
+            pathType: Prefix
+            backend:
+              service:
+                name: order-service
+                port:
+                  number: 8080
