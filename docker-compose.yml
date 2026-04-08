@@ -135,8 +135,9 @@ services:
       - SPRING_DATASOURCE_USERNAME=root
       - SPRING_DATASOURCE_PASSWORD=temp_password
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - SPRING_REDIS_HOST=redis
-      - SPRING_REDIS_PORT=6379
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - MEMBER_SERVICE_URL=http://member-service:8080
     depends_on:
       notification-db:
         condition: service_healthy
