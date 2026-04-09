@@ -16,3 +16,6 @@
 [submodule "team1-backend-member"]
 	path = team1-backend-member
 	url = https://github.com/hanhwa-swcamp-22th-final/team1-backend-member.git
+[submodule "team1-backend-batch"]
+	path = team1-backend-batch
+	url = https://github.com/hanhwa-swcamp-22th-final/team1-backend-batch.git
