@@ -54,10 +54,19 @@ services:
   frontend:
     build:
       context: ./team1-frontend
-      dockerfile: Dockerfile
+      target: build    # node:22-alpine stage (nginx stage 불필요)
     container_name: conk-frontend
+    command: npm run dev -- --host 0.0.0.0
+    volumes:
+      - ./team1-frontend:/app          # 소스 코드 실시간 동기화 (HMR)
+      - /app/node_modules              # 컨테이너 node_modules 보호
+    environment:
+      - VITE_API_BASE_URL=http://localhost   # 브라우저 → Nginx(:80) 직접 요청
     ports:
-      - "3000:80"
+      - "5173:5173"
+    depends_on:
+      api-gateway:
+        condition: service_started
     networks:
       - conk-network
     restart: unless-stopped
@@ -75,10 +84,21 @@ services:
       - "8081:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=dev
-      - SPRING_DATASOURCE_URL=jdbc:mariadb://member-db:3306/member_db?useSSL=false&serverTimezone=Asia/Seoul
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=temp_password
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_DATASOURCE_URL=${MEMBER_DB_URL}
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRATION=${JWT_EXPIRATION}
+      - JWT_REFRESH_EXPIRATION=${JWT_REFRESH_EXPIRATION}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME}
+      - MAIL_SERVICE_NAME=${MAIL_SERVICE_NAME}
+      - MAIL_LOGIN_URL=${MAIL_LOGIN_URL}
+      - MAIL_SETUP_BASE_URL=${MAIL_SETUP_BASE_URL}
     depends_on:
       member-db:
         condition: service_healthy
@@ -89,7 +109,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      start_period: 60s
+      start_period: 150s
       interval: 15s
       timeout: 5s
       retries: 5
@@ -103,10 +123,12 @@ services:
       - "8084:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=dev
-      - SPRING_DATASOURCE_URL=jdbc:mariadb://integration-db:3306/integration_db?useSSL=false&serverTimezone=Asia/Seoul
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=temp_password
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_DATASOURCE_URL=${INTEGRATION_DB_URL}
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+      - EASYPOST_API_KEY=${EASYPOST_API_KEY}
+      - EASYPOST_BASE_URL=${EASYPOST_BASE_URL}
     depends_on:
       integration-db:
         condition: service_healthy
@@ -117,7 +139,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      start_period: 60s
+      start_period: 150s
       interval: 15s
       timeout: 5s
       retries: 5
@@ -131,13 +153,13 @@ services:
       - "8085:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=dev
-      - SPRING_DATASOURCE_URL=jdbc:mariadb://notification-db:3306/notification_db?useSSL=false&serverTimezone=Asia/Seoul
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=temp_password
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - SPRING_DATA_REDIS_HOST=redis
-      - SPRING_DATA_REDIS_PORT=6379
-      - MEMBER_SERVICE_URL=http://member-service:8080
+      - SPRING_DATASOURCE_URL=${NOTIFICATION_DB_URL}
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+      - SPRING_DATA_REDIS_HOST=${SPRING_DATA_REDIS_HOST}
+      - SPRING_DATA_REDIS_PORT=${SPRING_DATA_REDIS_PORT}
+      - MEMBER_SERVICE_URL=${MEMBER_SERVICE_URL}
     depends_on:
       notification-db:
         condition: service_healthy
@@ -150,7 +172,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      start_period: 60s
+      start_period: 150s
       interval: 15s
       timeout: 5s
       retries: 5
@@ -164,10 +186,10 @@ services:
       - "8083:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=dev
-      - SPRING_DATASOURCE_URL=jdbc:mariadb://wms-db:3306/wms_db?useSSL=false&serverTimezone=Asia/Seoul
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=temp_password
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_DATASOURCE_URL=${WMS_DB_URL}
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=${SPRING_KAFKA_BOOTSTRAP_SERVERS}
     depends_on:
       wms-db:
         condition: service_healthy
@@ -178,7 +200,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      start_period: 60s
+      start_period: 150s
       interval: 15s
       timeout: 5s
       retries: 5
@@ -192,10 +214,10 @@ services:
       - "8082:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=dev
-      - SPRING_DATASOURCE_URL=jdbc:mariadb://order-db:3306/order_db?useSSL=false&serverTimezone=Asia/Seoul
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=temp_password
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_DATASOURCE_URL=${ORDER_DB_URL}
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=${SPRING_KAFKA_BOOTSTRAP_SERVERS}
     depends_on:
       order-db:
         condition: service_healthy
@@ -206,7 +228,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      start_period: 60s
+      start_period: 150s
       interval: 15s
       timeout: 5s
       retries: 5
@@ -221,7 +243,7 @@ services:
     ports:
       - "3309:3306"    # 로컬 개발용 외부 노출
     environment:
-      - MARIADB_ROOT_PASSWORD=temp_password
+      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
       - MARIADB_DATABASE=member_db
     volumes:
       - member-db-data:/var/lib/mysql
@@ -241,7 +263,7 @@ services:
     ports:
       - "3310:3306"    # 로컬 개발용 외부 노출
     environment:
-      - MARIADB_ROOT_PASSWORD=temp_password
+      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
       - MARIADB_DATABASE=integration_db
     volumes:
       - integration-db-data:/var/lib/mysql
@@ -261,7 +283,7 @@ services:
     ports:
       - "3307:3306"    # 로컬 개발용 외부 노출
     environment:
-      - MARIADB_ROOT_PASSWORD=temp_password
+      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
       - MARIADB_DATABASE=notification_db
     volumes:
       - notification-db-data:/var/lib/mysql
@@ -281,7 +303,7 @@ services:
     ports:
       - "3311:3306"    # 로컬 개발용 외부 노출
     environment:
-      - MARIADB_ROOT_PASSWORD=temp_password
+      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
       - MARIADB_DATABASE=wms_db
     volumes:
       - wms-db-data:/var/lib/mysql
@@ -301,7 +323,7 @@ services:
     ports:
       - "3308:3306"    # 로컬 개발용 외부 노출
     environment:
-      - MARIADB_ROOT_PASSWORD=temp_password
+      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
       - MARIADB_DATABASE=order_db
     volumes:
       - order-db-data:/var/lib/mysql
