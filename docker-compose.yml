@@ -113,10 +113,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      start_period: 150s
-      interval: 15s
-      timeout: 5s
-      retries: 5
+      start_period: 300s
+      interval: 20s
+      timeout: 10s
+      retries: 10
 
   integration-service:
     build:
@@ -143,10 +143,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      start_period: 150s
-      interval: 15s
-      timeout: 5s
-      retries: 5
+      start_period: 300s
+      interval: 20s
+      timeout: 10s
+      retries: 10
 
   notification-service:
     build:
@@ -176,10 +176,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      start_period: 150s
-      interval: 15s
-      timeout: 5s
-      retries: 5
+      start_period: 300s
+      interval: 20s
+      timeout: 10s
+      retries: 10
 
   wms-service:
     build:
@@ -207,10 +207,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      start_period: 150s
-      interval: 15s
-      timeout: 5s
-      retries: 5
+      start_period: 300s
+      interval: 20s
+      timeout: 10s
+      retries: 10
 
   order-service:
     build:
@@ -235,10 +235,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      start_period: 150s
-      interval: 15s
-      timeout: 5s
-      retries: 5
+      start_period: 300s
+      interval: 20s
+      timeout: 10s
+      retries: 10
 
   batch-service:
     build:
