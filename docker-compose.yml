@@ -229,6 +229,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+      - WMS_SERVICE_URL=http://wms-service:8080
     depends_on:
       order-db:
         condition: service_healthy
