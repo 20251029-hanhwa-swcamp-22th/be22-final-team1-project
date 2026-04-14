@@ -8,7 +8,9 @@ volumes:
   integration-db-data:
   notification-db-data:
   wms-db-data:
+  wms-read-db-data:
   order-db-data:
+  batch-db-data:
   redis-data:
   kafka-data:
 
@@ -42,6 +44,8 @@ services:
       wms-service:
         condition: service_healthy
       order-service:
+        condition: service_healthy
+      batch-service:
         condition: service_healthy
     networks:
       - conk-network
@@ -190,6 +194,9 @@ services:
       - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+      - KAFKA_CONSUMER_GROUP_ID=${KAFKA_CONSUMER_GROUP_ID}
+      - APP_KAFKA_TOPICS_BILLING_MONTHLY_RESULT=${APP_KAFKA_TOPIC_BILLING_MONTHLY_RESULT}
+      - APP_KAFKA_CONSUMER_BILLING_MONTHLY_RESULT_AUTO_STARTUP=true
     depends_on:
       wms-db:
         condition: service_healthy
@@ -232,6 +239,48 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+
+  batch-service:
+    build:
+      context: ./team1-backend-batch
+      dockerfile: Dockerfile
+    container_name: conk-batch-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=${BATCH_DB_URL}
+      - BATCH_DB_USERNAME=${DB_USERNAME}
+      - BATCH_DB_PASSWORD=${DB_PASSWORD}
+      - WMS_READ_DB_URL=${WMS_READ_DB_URL}
+      - WMS_READ_DB_USERNAME=${DB_USERNAME}
+      - WMS_READ_DB_PASSWORD=${DB_PASSWORD}
+      - WMS_BASE_URL=http://wms-service:8080
+      - KAFKA_BOOTSTRAP_SERVERS=${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+      - APP_BILLING_SCHEDULING_ENABLED=true
+      - APP_BILLING_SCHEDULING_ZONE=Asia/Seoul
+      - APP_BILLING_SCHEDULING_DAILY_BIN_SNAPSHOT_CRON=0 0 6 * * *
+      - APP_BILLING_SCHEDULING_MONTHLY_BILLING_CRON=0 10 6 1 * *
+      - APP_KAFKA_TOPICS_BILLING_MONTHLY_RESULT=${APP_KAFKA_TOPIC_BILLING_MONTHLY_RESULT}
+    depends_on:
+      batch-db:
+        condition: service_healthy
+      wms-db:
+        condition: service_healthy
+      wms-read-db:
+        condition: service_healthy
+      wms-service:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - conk-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
+      start_period: 60s
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
 
   # ============================================================
   # MariaDB — 서비스별 완전 격리 (총 5개)
@@ -307,6 +356,8 @@ services:
       - MARIADB_DATABASE=wms_db
     volumes:
       - wms-db-data:/var/lib/mysql
+      - ./docker/mariadb/wms-primary/primary.cnf:/etc/mysql/conf.d/primary.cnf:ro
+      - ./docker/mariadb/wms-primary/initdb:/docker-entrypoint-initdb.d:ro
     networks:
       - conk-network
     restart: unless-stopped
@@ -316,6 +367,28 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  wms-read-db:
+    image: mariadb:10.11
+    container_name: conk-wms-read-db
+    ports:
+      - "3313:3306"
+    environment:
+      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MARIADB_DATABASE=wms_db
+    volumes:
+      - wms-read-db-data:/var/lib/mysql
+      - ./docker/mariadb/wms-replica/replica.cnf:/etc/mysql/conf.d/replica.cnf:ro
+    networks:
+      - conk-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 
   order-db:
     image: mariadb:10.11
@@ -336,6 +409,27 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  batch-db:
+    image: mariadb:10.11
+    container_name: conk-batch-db
+    ports:
+      - "3312:3306"
+    environment:
+      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MARIADB_DATABASE=batch_db
+    volumes:
+      - batch-db-data:/var/lib/mysql
+    networks:
+      - conk-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 
   # ============================================================
   # Redis 7 — notification-service 알림 캐싱 + SSE Pub/Sub
