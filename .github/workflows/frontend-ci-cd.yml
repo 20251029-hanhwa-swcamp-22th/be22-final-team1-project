@@ -10,6 +10,10 @@ on:
     paths:
       - 'team1-frontend'
 
+concurrency:
+  group: k8s-manifests-update
+  cancel-in-progress: false
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
@@ -82,6 +86,16 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           cd k8s-manifests
           git remote set-url origin git@github.com:gusgh075/hw22th-final-team1-k8s-manifest.git
+          git pull --rebase origin HEAD
           git add deployments.yaml
-          git commit -m "chore: update frontend-service image to ${{ github.run_number }} [skip ci]" || echo "No changes to commit"
-          git push origin HEAD
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            LAST_MSG=$(git log -1 --format='%s')
+            if echo "$LAST_MSG" | grep -q "run #${{ github.run_number }}"; then
+              git commit --amend --no-edit
+            else
+              git commit -m "chore: update image tags (run #${{ github.run_number }}) [skip ci]"
+            fi
+            git push --force-with-lease origin HEAD
+          fi

@@ -13,6 +13,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: k8s-manifests-update
+  cancel-in-progress: false
+
 jobs:
   call-workflow:
     uses: ./.github/workflows/java-ci-cd.yml
