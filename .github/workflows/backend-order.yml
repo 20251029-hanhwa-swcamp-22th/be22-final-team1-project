@@ -17,4 +17,5 @@ jobs:
       service_name: order-service
       working_directory: team1-backend-order
       image_name: order-service
+      use_dockerhub: true
     secrets: inherit

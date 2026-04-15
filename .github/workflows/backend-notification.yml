@@ -17,4 +17,5 @@ jobs:
       service_name: notification-service
       working_directory: team1-backend-notification
       image_name: notification-service
+      use_dockerhub: true
     secrets: inherit

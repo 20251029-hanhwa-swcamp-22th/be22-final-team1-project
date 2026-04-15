@@ -17,4 +17,5 @@ jobs:
       service_name: member-service
       working_directory: team1-backend-member
       image_name: member-service
+      use_dockerhub: true
     secrets: inherit

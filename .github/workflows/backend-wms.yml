@@ -17,4 +17,5 @@ jobs:
       service_name: wms-service
       working_directory: team1-backend-wms
       image_name: wms-service
+      use_dockerhub: true
     secrets: inherit

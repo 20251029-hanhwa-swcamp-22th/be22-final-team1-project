@@ -17,4 +17,5 @@ jobs:
       service_name: batch-service
       working_directory: team1-backend-batch
       image_name: batch-service
+      use_dockerhub: true
     secrets: inherit

@@ -17,4 +17,5 @@ jobs:
       service_name: integration-service
       working_directory: team1-backend-integration
       image_name: integration-service
+      use_dockerhub: true
     secrets: inherit
