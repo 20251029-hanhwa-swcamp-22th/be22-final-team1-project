@@ -27,11 +27,8 @@ jobs:
           fetch-depth: 0
           submodules: false
 
-      - name: Checkout k8s-manifests submodule via SSH
-        run: |
-          git submodule init
-          git config submodule.k8s-manifests.url git@github.com:gusgh075/hw22th-final-team1-k8s-manifest.git
-          git submodule update
+      - name: Clone k8s-manifests via SSH
+        run: git clone git@github.com:gusgh075/hw22th-final-team1-k8s-manifest.git k8s-manifests
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
