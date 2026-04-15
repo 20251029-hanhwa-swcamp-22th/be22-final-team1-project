@@ -41,6 +41,9 @@ jobs:
           fetch-depth: 0
           submodules: false
 
+      - name: Checkout service submodule
+        run: git submodule update --init -- ${{ inputs.working_directory }}
+
       - name: Clone k8s-manifests via SSH
         run: git clone git@github.com:gusgh075/hw22th-final-team1-k8s-manifest.git k8s-manifests
 
