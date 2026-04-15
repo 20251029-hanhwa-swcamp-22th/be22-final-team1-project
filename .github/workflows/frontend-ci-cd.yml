@@ -86,7 +86,6 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           cd k8s-manifests
           git remote set-url origin git@github.com:gusgh075/hw22th-final-team1-k8s-manifest.git
-          git pull --rebase origin HEAD
           git add deployments.yaml
           if git diff --cached --quiet; then
             echo "No changes to commit"
@@ -97,5 +96,6 @@ jobs:
             else
               git commit -m "chore: update image tags (run #${{ github.run_number }}) [skip ci]"
             fi
+            git pull --rebase origin HEAD
             git push --force-with-lease origin HEAD
           fi
