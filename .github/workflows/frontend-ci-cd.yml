@@ -60,7 +60,7 @@ jobs:
           context: ./team1-frontend
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/frontend-service:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/frontend-service:${{ github.run_number }}
             ${{ secrets.DOCKERHUB_USERNAME }}/frontend-service:latest
           build-args: |
             VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}
@@ -70,7 +70,7 @@ jobs:
       - name: Update Kubernetes resources
         if: github.ref == 'refs/heads/main'
         run: |
-          sed -i "s|image: .*/frontend-service:.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend-service:${{ github.sha }}|g" k8s-manifests/deployments.yaml
+          sed -i "s|image: .*/frontend-service:.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend-service:${{ github.run_number }}|g" k8s-manifests/deployments.yaml
 
       - name: Commit and push changes
         if: github.ref == 'refs/heads/main'
@@ -80,5 +80,5 @@ jobs:
           cd k8s-manifests
           git remote set-url origin git@github.com:gusgh075/hw22th-final-team1-k8s-manifest.git
           git add deployments.yaml
-          git commit -m "chore: update frontend-service image to ${{ github.sha }} [skip ci]" || echo "No changes to commit"
+          git commit -m "chore: update frontend-service image to ${{ github.run_number }} [skip ci]" || echo "No changes to commit"
           git push origin HEAD

@@ -74,13 +74,13 @@ jobs:
           context: ./${{ inputs.working_directory }}
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ github.run_number }}
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:latest
 
       - name: Update Kubernetes resources
         if: github.ref == 'refs/heads/main' && inputs.use_dockerhub
         run: |
-          IMAGE_PATH="${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ github.sha }}"
+          IMAGE_PATH="${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ github.run_number }}"
           sed -i "s|image: .*/\?${{ inputs.image_name }}:.*|image: $IMAGE_PATH|g" k8s-manifests/deployments.yaml
 
       - name: Commit and push changes
@@ -91,5 +91,5 @@ jobs:
           cd k8s-manifests
           git remote set-url origin git@github.com:gusgh075/hw22th-final-team1-k8s-manifest.git
           git add deployments.yaml
-          git commit -m "chore: update ${{ inputs.service_name }} image to ${{ github.sha }} [skip ci]" || echo "No changes to commit"
+          git commit -m "chore: update ${{ inputs.service_name }} image to ${{ github.run_number }} [skip ci]" || echo "No changes to commit"
           git push origin HEAD
