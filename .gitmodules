@@ -19,3 +19,6 @@
 [submodule "team1-backend-batch"]
 	path = team1-backend-batch
 	url = https://github.com/hanhwa-swcamp-22th-final/team1-backend-batch.git
+[submodule "k8s-manifests"]
+	path = k8s-manifests
+	url = https://github.com/gusgh075/hw22th-final-team1-k8s-manifest.git
