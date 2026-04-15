@@ -106,6 +106,9 @@ jobs:
             else
               git commit -m "chore: update image tags (run #${{ github.run_number }}) [skip ci]"
             fi
-            git pull --rebase origin HEAD
-            git push --force-with-lease origin HEAD
+            for i in 1 2 3; do
+              git pull --rebase origin HEAD && git push --force-with-lease origin HEAD && break
+              echo "Push failed, retrying ($i/3)..."
+              sleep $((RANDOM % 5 + 2))
+            done
           fi

@@ -10,10 +10,6 @@ on:
     paths:
       - 'team1-frontend'
 
-concurrency:
-  group: k8s-manifests-update
-  cancel-in-progress: false
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
@@ -30,6 +26,9 @@ jobs:
         with:
           fetch-depth: 0
           submodules: false
+
+      - name: Checkout frontend submodule
+        run: git submodule update --init -- team1-frontend
 
       - name: Clone k8s-manifests via SSH
         run: git clone git@github.com:gusgh075/hw22th-final-team1-k8s-manifest.git k8s-manifests
@@ -96,6 +95,9 @@ jobs:
             else
               git commit -m "chore: update image tags (run #${{ github.run_number }}) [skip ci]"
             fi
-            git pull --rebase origin HEAD
-            git push --force-with-lease origin HEAD
+            for i in 1 2 3; do
+              git pull --rebase origin HEAD && git push --force-with-lease origin HEAD && break
+              echo "Push failed, retrying ($i/3)..."
+              sleep $((RANDOM % 5 + 2))
+            done
           fi
