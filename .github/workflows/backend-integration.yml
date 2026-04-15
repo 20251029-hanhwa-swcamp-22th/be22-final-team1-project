@@ -1,0 +1,20 @@
+name: Backend Integration CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'team1-backend-integration'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'team1-backend-integration'
+
+jobs:
+  call-workflow:
+    uses: ./.github/workflows/java-ci-cd.yml
+    with:
+      service_name: integration-service
+      working_directory: team1-backend-integration
+      image_name: integration-service
+    secrets: inherit

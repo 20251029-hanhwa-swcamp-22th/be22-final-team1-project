@@ -1,0 +1,20 @@
+name: Backend Notification CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'team1-backend-notification'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'team1-backend-notification'
+
+jobs:
+  call-workflow:
+    uses: ./.github/workflows/java-ci-cd.yml
+    with:
+      service_name: notification-service
+      working_directory: team1-backend-notification
+      image_name: notification-service
+    secrets: inherit
