@@ -1,0 +1,20 @@
+name: Backend Member CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'team1-backend-member'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'team1-backend-member'
+
+jobs:
+  call-workflow:
+    uses: ./.github/workflows/java-ci-cd.yml
+    with:
+      service_name: member-service
+      working_directory: team1-backend-member
+      image_name: member-service
+    secrets: inherit

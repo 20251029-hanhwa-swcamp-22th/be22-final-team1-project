@@ -1,0 +1,20 @@
+name: Backend WMS CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'team1-backend-wms'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'team1-backend-wms'
+
+jobs:
+  call-workflow:
+    uses: ./.github/workflows/java-ci-cd.yml
+    with:
+      service_name: wms-service
+      working_directory: team1-backend-wms
+      image_name: wms-service
+    secrets: inherit

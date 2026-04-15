@@ -1,0 +1,20 @@
+name: Backend Batch CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'team1-backend-batch'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'team1-backend-batch'
+
+jobs:
+  call-workflow:
+    uses: ./.github/workflows/java-ci-cd.yml
+    with:
+      service_name: batch-service
+      working_directory: team1-backend-batch
+      image_name: batch-service
+    secrets: inherit
