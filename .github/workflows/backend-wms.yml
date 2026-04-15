@@ -10,6 +10,9 @@ on:
     paths:
       - 'team1-backend-wms'
 
+permissions:
+  contents: write
+
 jobs:
   call-workflow:
     uses: ./.github/workflows/java-ci-cd.yml
