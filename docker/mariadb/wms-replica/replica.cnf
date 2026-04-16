@@ -1,5 +1,0 @@
-[mysqld]
-server-id=2
-read_only=ON
-relay_log=relay-bin
-gtid_strict_mode=ON

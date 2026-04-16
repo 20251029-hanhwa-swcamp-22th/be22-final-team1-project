@@ -302,7 +302,7 @@ services:
     ports:
       - "7009:3306"    # 로컬 개발용 외부 노출
     environment:
-      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MARIADB_ROOT_PASSWORD=root
       - MARIADB_DATABASE=member_db
     volumes:
       - member-db-data:/var/lib/mysql
@@ -322,7 +322,7 @@ services:
     ports:
       - "7010:3306"    # 로컬 개발용 외부 노출
     environment:
-      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MARIADB_ROOT_PASSWORD=root
       - MARIADB_DATABASE=integration_db
     volumes:
       - integration-db-data:/var/lib/mysql
@@ -342,7 +342,7 @@ services:
     ports:
       - "7007:3306"    # 로컬 개발용 외부 노출
     environment:
-      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MARIADB_ROOT_PASSWORD=root
       - MARIADB_DATABASE=notification_db
     volumes:
       - notification-db-data:/var/lib/mysql
@@ -362,7 +362,7 @@ services:
     ports:
       - "7011:3306"    # 로컬 개발용 외부 노출
     environment:
-      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MARIADB_ROOT_PASSWORD=root
       - MARIADB_DATABASE=wms_db
     volumes:
       - wms-db-data:/var/lib/mysql
@@ -384,7 +384,7 @@ services:
     ports:
       - "7013:3306"
     environment:
-      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MARIADB_ROOT_PASSWORD=root
       - MARIADB_DATABASE=wms_db
     volumes:
       - wms-read-db-data:/var/lib/mysql
@@ -406,7 +406,7 @@ services:
     ports:
       - "7008:3306"    # 로컬 개발용 외부 노출
     environment:
-      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MARIADB_ROOT_PASSWORD=root
       - MARIADB_DATABASE=order_db
     volumes:
       - order-db-data:/var/lib/mysql
@@ -426,7 +426,7 @@ services:
     ports:
       - "7012:3306"
     environment:
-      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MARIADB_ROOT_PASSWORD=root
       - MARIADB_DATABASE=batch_db
     volumes:
       - batch-db-data:/var/lib/mysql

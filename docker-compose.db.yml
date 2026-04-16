@@ -1,0 +1,43 @@
+volumes:
+  main-db-data:
+  wms-read-db-data:
+
+services:
+  main-db:
+    image: mariadb:10.11
+    container_name: conk-main-db
+    ports:
+      - "7010:3306"
+    environment:
+      - MARIADB_ROOT_PASSWORD= {fill}
+    volumes:
+      - main-db-data:/var/lib/mysql
+      - ./docker/mariadb/main-db/initdb:/docker-entrypoint-initdb.d:ro
+      - ./docker/mariadb/wms-primary/primary.cnf:/etc/mysql/conf.d/primary.cnf:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  wms-read-db:
+    image: mariadb:10.11
+    container_name: conk-wms-read-db
+    ports:
+      - "7011:3306"
+    environment:
+      - MARIADB_ROOT_PASSWORD={fill}
+    volumes:
+      - wms-read-db-data:/var/lib/mysql
+      - ./docker/mariadb/wms-read-db/initdb:/docker-entrypoint-initdb.d:ro
+      - ./docker/mariadb/wms-replica/replica.cnf:/etc/mysql/conf.d/replica.cnf:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      main-db:
+        condition: service_healthy
+    restart: unless-stopped

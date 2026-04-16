@@ -1,3 +1,0 @@
-CREATE USER IF NOT EXISTS 'replica'@'%' IDENTIFIED BY 'replica_pw';
-GRANT REPLICATION SLAVE ON *.* TO 'replica'@'%';
-FLUSH PRIVILEGES;
