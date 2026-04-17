@@ -112,11 +112,12 @@ jobs:
 
       # deployments.yaml에서 frontend-service의 image 태그를 새 버전으로 교체
       # name: frontend-service 라인을 찾아 다음 줄(image:)을 교체 — image가 비어있어도 동작함
+      # job output 의존 제거: secrets + inputs로 직접 재조합해 set-image 스텝 스킵 시에도 정상 동작
       - name: Update image tag in deployments.yaml
         run: |
-          IMAGE_PATH="${{ needs.build-and-push.outputs.image_path }}"
-          if [ -z "$IMAGE_PATH" ]; then
-            echo "ERROR: image_path is empty — skipping update to prevent overwriting existing image tag"
+          IMAGE_PATH="${{ secrets.DOCKERHUB_USERNAME }}/frontend-service:${{ github.run_number }}"
+          if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
+            echo "ERROR: DOCKERHUB_USERNAME secret is empty — aborting to prevent overwriting existing image tag"
             exit 1
           fi
           sed -i "/name: frontend-service/{n; s|image:.*|image: $IMAGE_PATH|}" k8s-manifests/deployments.yaml
