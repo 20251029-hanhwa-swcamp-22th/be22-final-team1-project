@@ -2,19 +2,21 @@ name: Reusable Java CI/CD
 
 # 여러 백엔드 서비스 workflow에서 공통으로 호출하는 재사용 가능한 workflow.
 # 역할: 소스 빌드 → Docker 이미지 push → k8s-manifests 이미지 태그 업데이트
+# workflow_call: 다른 workflow에서 'uses:' 키워드로 이 workflow를 호출할 수 있도록 한다.
+# 6개 백엔드 서비스가 각자 workflow를 가지지 않고 이 파일 하나를 공통으로 재사용한다.
 on:
   workflow_call:
     inputs:
-      service_name:
+      service_name:        # ArgoCD/k8s에서 사용하는 서비스 식별자
         required: true
         type: string
-      working_directory:
+      working_directory:   # 서브모듈 경로 (예: team1-backend-member)
         required: true
         type: string
-      image_name:
+      image_name:          # Docker Hub 이미지 이름 (예: member-service)
         required: true
         type: string
-      use_dockerhub:
+      use_dockerhub:       # false이면 이미지 push와 k8s 태그 업데이트를 건너뜀 (테스트 전용 실행 시 사용)
         required: false
         type: boolean
         default: false
@@ -23,7 +25,7 @@ on:
         required: false
       DOCKERHUB_TOKEN:
         required: false
-      K8S_DEPLOY_KEY:
+      K8S_DEPLOY_KEY:      # k8s-manifests 레포 SSH 접근용 Deploy Key (필수)
         required: true
 
 jobs:
@@ -36,41 +38,44 @@ jobs:
       # update-k8s job에서 사용할 이미지 경로를 output으로 노출
       image_path: ${{ steps.set-image.outputs.image_path }}
     steps:
-      # 메인 레포 체크아웃 (서브모듈은 아직 초기화하지 않음)
+      # 전체 서브모듈을 한꺼번에 clone하면 불필요한 다른 서비스 소스까지 내려받게 된다.
+      # 먼저 메인 레포만 체크아웃하고, 아래 단계에서 해당 서비스 서브모듈만 초기화한다.
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          submodules: false
+          fetch-depth: 0       # 전체 git 히스토리 포함 (태그/브랜치 비교에 필요)
+          submodules: false    # 서브모듈은 아직 초기화하지 않음
 
-      # 해당 서비스의 서브모듈만 선택적으로 초기화 (전체 서브모듈 clone 방지)
+      # inputs.working_directory에 해당하는 서비스 서브모듈만 선택적으로 초기화
       - name: Checkout service submodule
         run: git submodule update --init -- ${{ inputs.working_directory }}
 
-      # Gradle 빌드에 필요한 JDK 21 설치 및 Gradle 캐시 활성화
+      # Gradle 의존성을 캐시해 두면 동일한 dependencies 환경에서 다음 실행 시 다운로드를 건너뛰어 빌드가 빨라진다
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: 'gradle'
+          cache: 'gradle'      # ~/.gradle 캐시 활성화
 
-      # gradlew에 실행 권한 부여 (Windows에서 커밋된 파일은 실행 비트가 없을 수 있음)
+      # Windows 환경에서 커밋된 gradlew는 실행 비트(+x)가 없을 수 있어 명시적으로 부여한다
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
         working-directory: ${{ inputs.working_directory }}
 
-      # 테스트 제외 빌드 (-x test): CI에서는 빌드 성공 여부만 확인
+      # -x test: CI에서는 Docker 이미지 빌드 가능 여부만 확인하므로 테스트는 제외한다.
+      # 테스트는 PR 단계에서 별도로 수행한다.
       - name: Build with Gradle
         run: ./gradlew build -x test
         working-directory: ${{ inputs.working_directory }}
 
-      # 멀티 플랫폼 Docker 이미지 빌드를 위한 Buildx 설정 (main 브랜치에서만)
+      # 멀티 플랫폼 이미지 빌드를 위한 Buildx 설정
+      # PR에서는 이미지를 push하지 않으므로 main 브랜치에서만 실행
       - name: Set up Docker Buildx
         if: github.ref == 'refs/heads/main'
         uses: docker/setup-buildx-action@v3
 
-      # Docker Hub 로그인 (main 브랜치 + use_dockerhub=true 인 경우에만)
+      # use_dockerhub가 false이면 이미지 push를 건너뜀
       - name: Login to Docker Hub
         if: github.ref == 'refs/heads/main' && inputs.use_dockerhub
         uses: docker/login-action@v3
@@ -78,8 +83,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Docker 이미지 빌드 후 Docker Hub에 push
-      # 태그 2개: run_number(고정 버전) + latest(최신 버전 alias)
+      # 태그를 2개 부여한다:
+      #   - run_number : 이 실행 고유 번호로, 특정 버전으로 롤백할 때 사용
+      #   - latest     : 항상 최신 이미지를 가리키는 alias
       - name: Build and push Docker image
         if: github.ref == 'refs/heads/main' && inputs.use_dockerhub
         uses: docker/build-push-action@v5
@@ -90,7 +96,7 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ github.run_number }}
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:latest
 
-      # 다음 job(update-k8s)에서 사용할 이미지 경로를 GITHUB_OUTPUT에 저장
+      # 다음 job(update-k8s)이 사용할 이미지 경로를 GITHUB_OUTPUT에 저장
       - name: Set image path output
         if: github.ref == 'refs/heads/main' && inputs.use_dockerhub
         id: set-image
@@ -100,41 +106,38 @@ jobs:
   # Job 2: k8s-manifests 이미지 태그 업데이트
   #
   # [concurrency group을 사용하지 않는 이유]
-  # GitHub Actions concurrency group은 "1개 running + 1개 pending"만 허용.
-  # 5개 서비스가 동시에 push되면 3개는 자동 cancel → 이미지 태그 누락 발생.
-  # 대신 fetch → rebase → push 10회 retry + 점진적 backoff으로 race condition 해소.
+  # GitHub Actions concurrency group은 "1개 running + 1개 pending"만 허용한다.
+  # 6개 서비스가 동시에 push되면 나머지 job들이 cancel되어 이미지 태그가 누락된다.
+  # 대신 fetch → rebase → push 10회 retry + 점진적 backoff으로 race condition을 해소한다.
   # ────────────────────────────────────────────────
   update-k8s:
-    needs: build-and-push
+    needs: build-and-push    # Job 1이 성공한 후에만 실행
     runs-on: ubuntu-latest
-    # build-and-push job이 이미지를 실제로 push한 경우에만 실행
     if: github.ref == 'refs/heads/main' && inputs.use_dockerhub
     permissions:
-      contents: write
+      contents: write        # k8s-manifests 레포에 commit/push하기 위한 권한
     steps:
-      # k8s-manifests 레포를 SSH로 clone하기 위한 Deploy Key 등록
+      # HTTPS 대신 SSH를 사용하는 이유: Deploy Key로 k8s-manifests 레포에만 접근 권한을 제한할 수 있어 보안상 유리
       - name: Set up SSH for k8s-manifests
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.K8S_DEPLOY_KEY }}
 
-      # k8s-manifests 레포를 SSH로 clone (HTTPS 대신 SSH: deploy key 인증)
       - name: Clone k8s-manifests via SSH
         run: git clone git@github.com:gusgh075/hw22th-final-team1-k8s-manifest.git k8s-manifests
 
-      # deployments.yaml에서 해당 서비스의 image 태그를 새 버전으로 교체
-      # name: <service> 라인을 찾아 다음 줄(image:)을 교체 — image가 비어있어도 동작함
-      # job output 의존 제거: secrets + inputs로 직접 재조합해 set-image 스텝 스킵 시에도 정상 동작
+      # deployments.yaml에서 'name: {image_name}' 줄을 찾고,
+      # 바로 다음 줄(image:)의 태그를 새 run_number로 교체한다
       - name: Update image tag in deployments.yaml
         run: |
           IMAGE_PATH="${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ github.run_number }}"
+          # Secret이 비어있으면 기존 태그를 덮어쓰는 사고를 방지하기 위해 사전 검증
           if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
             echo "ERROR: DOCKERHUB_USERNAME secret is empty — aborting to prevent overwriting existing image tag"
             exit 1
           fi
           sed -i "/name: ${{ inputs.image_name }}/{n; s|image:.*|image: $IMAGE_PATH|}" k8s-manifests/deployments.yaml
 
-      # 변경 사항을 커밋하고 push (race condition 대비 10회 retry)
       - name: Commit and push changes
         run: |
           git config --global user.name "github-actions[bot]"
@@ -143,19 +146,19 @@ jobs:
           git remote set-url origin git@github.com:gusgh075/hw22th-final-team1-k8s-manifest.git
           git add deployments.yaml
 
-          # 이미 동일한 태그가 반영되어 있으면 커밋 불필요
+          # 이미 동일한 태그가 반영되어 있으면 불필요한 커밋을 생성하지 않고 종료
           if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
           fi
 
-          # 서비스명을 포함한 커밋 메시지로 어떤 서비스가 업데이트됐는지 구분
-          # [skip ci]: k8s-manifests 레포 자체의 CI가 있을 경우 무한 루프 방지
+          # 서비스명을 커밋 메시지에 포함해 k8s-manifests 히스토리에서 어떤 서비스가 업데이트됐는지 구분
+          # [skip ci]: k8s-manifests 레포에 자체 CI가 있을 경우 이 커밋으로 인한 무한 루프를 방지
           git commit -m "chore: update ${{ inputs.image_name }} tag (run #${{ github.run_number }}) [skip ci]"
 
-          # 여러 서비스 workflow가 동시에 push할 때 race condition 해소 retry 루프
-          # 전략: fetch → rebase → push (rebase 후에는 항상 fast-forward 상태)
-          # backoff: i*2 + rand(0~4)초 → 2~6s, 4~8s, 6~10s ... 점진적으로 증가
+          # 여러 서비스가 동시에 push할 때 git 충돌이 발생할 수 있다.
+          # fetch → rebase로 최신 상태를 맞춘 뒤 push하는 방식으로 충돌을 해소한다.
+          # backoff: 1회 실패 시 2~6초, 2회 실패 시 4~8초 ... 점진적으로 대기 시간 증가
           # 7개 서비스 동시 push 최악 케이스 필요 시간 ~21초 대비 예산 ~140초로 충분
           pushed=false
           for i in $(seq 1 10); do
@@ -166,8 +169,7 @@ jobs:
             sleep $((i * 2 + RANDOM % 5))
           done
 
-          # 10회 모두 실패 시 workflow를 명시적으로 실패 처리
-          # (이전에는 exit 1이 없어서 push 실패해도 workflow가 success로 표시됨)
+          # 10회 모두 실패하면 워크플로를 명시적으로 실패 처리 (silent 성공 방지)
           if [ "$pushed" = "false" ]; then
             echo "ERROR: Failed to push to k8s-manifests after 10 attempts"
             exit 1

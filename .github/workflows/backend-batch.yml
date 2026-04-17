@@ -4,22 +4,24 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'team1-backend-batch'
+      - 'team1-backend-batch'   # batch 서비스 변경 시에만 이 workflow가 실행됨
   pull_request:
     branches: [ "main" ]
     paths:
       - 'team1-backend-batch'
-  workflow_dispatch:
+  workflow_dispatch:            # GitHub UI에서 수동 실행 허용
 
 permissions:
-  contents: write
+  contents: write               # k8s-manifests 레포 커밋/푸시에 필요한 권한
 
 jobs:
   call-workflow:
+    # java-ci-cd.yml을 재사용 workflow로 호출한다.
+    # 빌드 → Docker push → k8s 태그 업데이트 로직은 모두 java-ci-cd.yml에서 처리된다.
     uses: ./.github/workflows/java-ci-cd.yml
     with:
-      service_name: batch-service
-      working_directory: team1-backend-batch
-      image_name: batch-service
-      use_dockerhub: true
-    secrets: inherit
+      service_name: batch-service            # k8s 서비스 식별자
+      working_directory: team1-backend-batch # 서브모듈 경로
+      image_name: batch-service              # Docker Hub 이미지 이름
+      use_dockerhub: true                    # 이미지 push 및 k8s 태그 업데이트 활성화
+    secrets: inherit                         # 부모 workflow의 secrets를 그대로 전달
