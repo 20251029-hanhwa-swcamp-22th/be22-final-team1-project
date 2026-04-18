@@ -12,7 +12,9 @@ services:
       - MARIADB_ROOT_PASSWORD= {fill}
     volumes:
       - main-db-data:/var/lib/mysql
+      # mariadb의 공식 도커 이미지는 docker-entrypoint-initdb.d/의 경로에 마운트된 파일들을 자동으로 실행
       - ./docker/mariadb/main-db/initdb:/docker-entrypoint-initdb.d:ro
+      # /etc/mysql/conf.d/ 이 경로에 있는 .cnf 파일들을 읽어들여 기본 설정을 덮어씌움
       - ./docker/mariadb/wms-primary/primary.cnf:/etc/mysql/conf.d/primary.cnf:ro
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
