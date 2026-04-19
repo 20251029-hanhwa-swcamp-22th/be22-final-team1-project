@@ -11,6 +11,14 @@ on:
         - 'team1-frontend'
   workflow_dispatch:         # GitHub UI에서 수동으로 워크플로를 실행할 수 있도록 허용
 
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  S3_BUCKET: ${{ vars.S3_BUCKET }}
+  CLOUDFRONT_ID: ${{ vars.CLOUDFRONT_ID }}
+  VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+  VITE_API_PREFIX: ${{ vars.VITE_API_PREFIX }}
+  VITE_DEMO_USER_PASSWORD: ${{ vars.VITE_DEMO_USER_PASSWORD }}
+
 jobs:
   # ────────────────────────────────────────────────
   # Job 1: 소스 빌드 + Docker 이미지 빌드 & push
@@ -45,7 +53,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY_ID }}
-          aws-region: ap-northeast-2
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -57,26 +65,21 @@ jobs:
         run: npm install
         working-directory: team1-frontend
 
-      # VITE 환경변수(API URL 등)는 빌드 시 번들에 포함되므로 여기서 build-args로 주입
-      # 실제 값은 GitHub Variables(vars.*)에 저장되어 있으며, Dockerfile ARG로 전달된다
+      # VITE_* 환경변수는 워크플로우 레벨 env에서 모든 step으로 자동 상속됨
       - name: Build
         run: npm run build:prod
         working-directory: team1-frontend
-        env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-          VITE_API_PREFIX: ${{ vars.VITE_API_PREFIX }}
-          VITE_DEMO_USER_PASSWORD: ${{ vars.VITE_DEMO_USER_PASSWORD }}
 
       - name: Sync files to S3
         if: github.ref == 'refs/heads/main'
-        run: aws s3 sync --delete ./dist s3://conk-site-prod-frontend
+        run: aws s3 sync --delete ./dist s3://${{ env.S3_BUCKET }}
         working-directory: team1-frontend
 
       - name: Clear Cache
         if: github.ref == 'refs/heads/main'
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id E2J0K8A44IWZ8V \
+            --distribution-id ${{ env.CLOUDFRONT_ID }} \
             --paths "/*"
 
       # 멀티 플랫폼(amd64/arm64) 이미지 빌드를 위한 Buildx 설정
@@ -97,7 +100,7 @@ jobs:
       #   - latest     : 항상 최신 이미지를 가리키는 alias
       - name: Build and push Docker image
         if: github.ref == 'refs/heads/main'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./team1-frontend
           push: true
@@ -105,9 +108,9 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/frontend-service:${{ github.run_number }}
             ${{ secrets.DOCKERHUB_USERNAME }}/frontend-service:latest
           build-args: |
-            VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}
-            VITE_API_PREFIX=${{ vars.VITE_API_PREFIX }}
-            VITE_DEMO_USER_PASSWORD=${{ vars.VITE_DEMO_USER_PASSWORD }}
+            VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }}
+            VITE_API_PREFIX=${{ env.VITE_API_PREFIX }}
+            VITE_DEMO_USER_PASSWORD=${{ env.VITE_DEMO_USER_PASSWORD }}
 
   # ────────────────────────────────────────────────
   # Job 2: k8s-manifests 이미지 태그 업데이트
