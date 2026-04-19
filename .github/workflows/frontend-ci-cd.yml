@@ -33,6 +33,23 @@ jobs:
       - name: Checkout frontend submodule
         run: git submodule update --init -- team1-frontend
 
+      - name: Cache node modules
+        uses: actions/cache@v3
+        with:
+          path: team1-frontend/node_modules
+          key: ${{ runner.OS }}-build-${{ hashFiles('team1-frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.OS }}-build-
+            ${{ runner.OS }}-
+
+      - name: Configure AWS Credentials
+        if: github.ref == 'refs/heads/main'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY_ID }}
+          aws-region: ap-northeast-2
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -48,6 +65,18 @@ jobs:
       - name: Build
         run: npm run build:prod
         working-directory: team1-frontend
+
+      - name: Sync files to S3
+        if: github.ref == 'refs/heads/main'
+        run: aws s3 sync --delete ./dist s3://conk-site-prod-frontend
+        working-directory: team1-frontend
+
+      - name: Clear Cache
+        if: github.ref == 'refs/heads/main'
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id E2J0K8A44IWZ8V \
+            --paths "/*"
 
       # 멀티 플랫폼(amd64/arm64) 이미지 빌드를 위한 Buildx 설정
       # main 브랜치가 아닌 PR에서는 이미지를 push하지 않으므로 main 브랜치에서만 실행
