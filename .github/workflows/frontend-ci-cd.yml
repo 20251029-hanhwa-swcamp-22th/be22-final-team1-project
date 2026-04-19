@@ -17,9 +17,6 @@ jobs:
   # ────────────────────────────────────────────────
   build-and-push:
     runs-on: ubuntu-latest
-    outputs:
-      # update-k8s job에서 사용할 이미지 경로를 output으로 노출
-      image_path: ${{ steps.set-image.outputs.image_path }}
     steps:
       # 전체 서브모듈을 한꺼번에 clone하면 불필요한 백엔드 소스까지 내려받아 시간이 오래 걸린다.
       # 따라서 메인 레포만 먼저 체크아웃하고, 아래 단계에서 frontend 서브모듈만 별도로 초기화한다.
@@ -34,7 +31,7 @@ jobs:
         run: git submodule update --init -- team1-frontend
 
       - name: Cache node modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: team1-frontend/node_modules
           key: ${{ runner.OS }}-build-${{ hashFiles('team1-frontend/package-lock.json') }}
@@ -65,6 +62,10 @@ jobs:
       - name: Build
         run: npm run build:prod
         working-directory: team1-frontend
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_API_PREFIX: ${{ vars.VITE_API_PREFIX }}
+          VITE_DEMO_USER_PASSWORD: ${{ vars.VITE_DEMO_USER_PASSWORD }}
 
       - name: Sync files to S3
         if: github.ref == 'refs/heads/main'
@@ -107,12 +108,6 @@ jobs:
             VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}
             VITE_API_PREFIX=${{ vars.VITE_API_PREFIX }}
             VITE_DEMO_USER_PASSWORD=${{ vars.VITE_DEMO_USER_PASSWORD }}
-
-      # 다음 job(update-k8s)이 사용할 이미지 경로를 GITHUB_OUTPUT에 저장
-      - name: Set image path output
-        if: github.ref == 'refs/heads/main'
-        id: set-image
-        run: echo "image_path=${{ secrets.DOCKERHUB_USERNAME }}/frontend-service:${{ github.run_number }}" >> $GITHUB_OUTPUT
 
   # ────────────────────────────────────────────────
   # Job 2: k8s-manifests 이미지 태그 업데이트
