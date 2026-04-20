@@ -11,15 +11,20 @@ on:
         - 'team1-frontend'
   workflow_dispatch:         # GitHub UI에서 수동으로 워크플로를 실행할 수 있도록 허용
 
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  S3_BUCKET: ${{ vars.S3_BUCKET }}
+  CLOUDFRONT_ID: ${{ vars.CLOUDFRONT_ID }}
+  VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+  VITE_API_PREFIX: ${{ vars.VITE_API_PREFIX }}
+  VITE_DEMO_USER_PASSWORD: ${{ vars.VITE_DEMO_USER_PASSWORD }}
+
 jobs:
   # ────────────────────────────────────────────────
   # Job 1: 소스 빌드 + Docker 이미지 빌드 & push
   # ────────────────────────────────────────────────
   build-and-push:
     runs-on: ubuntu-latest
-    outputs:
-      # update-k8s job에서 사용할 이미지 경로를 output으로 노출
-      image_path: ${{ steps.set-image.outputs.image_path }}
     steps:
       # 전체 서브모듈을 한꺼번에 clone하면 불필요한 백엔드 소스까지 내려받아 시간이 오래 걸린다.
       # 따라서 메인 레포만 먼저 체크아웃하고, 아래 단계에서 frontend 서브모듈만 별도로 초기화한다.
@@ -33,6 +38,23 @@ jobs:
       - name: Checkout frontend submodule
         run: git submodule update --init -- team1-frontend
 
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: team1-frontend/node_modules
+          key: ${{ runner.OS }}-build-${{ hashFiles('team1-frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.OS }}-build-
+            ${{ runner.OS }}-
+
+      - name: Configure AWS Credentials
+        if: github.ref == 'refs/heads/main'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY_ID }}
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -43,11 +65,22 @@ jobs:
         run: npm install
         working-directory: team1-frontend
 
-      # VITE 환경변수(API URL 등)는 빌드 시 번들에 포함되므로 여기서 build-args로 주입
-      # 실제 값은 GitHub Variables(vars.*)에 저장되어 있으며, Dockerfile ARG로 전달된다
+      # VITE_* 환경변수는 워크플로우 레벨 env에서 모든 step으로 자동 상속됨
       - name: Build
         run: npm run build:prod
         working-directory: team1-frontend
+
+      - name: Sync files to S3
+        if: github.ref == 'refs/heads/main'
+        run: aws s3 sync --delete ./dist s3://${{ env.S3_BUCKET }}
+        working-directory: team1-frontend
+
+      - name: Clear Cache
+        if: github.ref == 'refs/heads/main'
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ env.CLOUDFRONT_ID }} \
+            --paths "/*"
 
       # 멀티 플랫폼(amd64/arm64) 이미지 빌드를 위한 Buildx 설정
       # main 브랜치가 아닌 PR에서는 이미지를 push하지 않으므로 main 브랜치에서만 실행
@@ -67,7 +100,7 @@ jobs:
       #   - latest     : 항상 최신 이미지를 가리키는 alias
       - name: Build and push Docker image
         if: github.ref == 'refs/heads/main'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./team1-frontend
           push: true
@@ -75,83 +108,6 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/frontend-service:${{ github.run_number }}
             ${{ secrets.DOCKERHUB_USERNAME }}/frontend-service:latest
           build-args: |
-            VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}
-            VITE_API_PREFIX=${{ vars.VITE_API_PREFIX }}
-            VITE_DEMO_USER_PASSWORD=${{ vars.VITE_DEMO_USER_PASSWORD }}
-
-      # 다음 job(update-k8s)이 사용할 이미지 경로를 GITHUB_OUTPUT에 저장
-      - name: Set image path output
-        if: github.ref == 'refs/heads/main'
-        id: set-image
-        run: echo "image_path=${{ secrets.DOCKERHUB_USERNAME }}/frontend-service:${{ github.run_number }}" >> $GITHUB_OUTPUT
-
-  # ────────────────────────────────────────────────
-  # Job 2: k8s-manifests 이미지 태그 업데이트
-  #
-  # [concurrency group을 사용하지 않는 이유]
-  # GitHub Actions concurrency group은 "1개 running + 1개 pending"만 허용한다.
-  # 프론트와 백엔드가 동시에 push되면 나머지 job들이 cancel되어 이미지 태그가 누락된다.
-  # 대신 fetch → rebase → push 10회 retry + 점진적 backoff으로 race condition을 해소한다.
-  # ────────────────────────────────────────────────
-  update-k8s:
-    needs: build-and-push    # Job 1이 성공한 후에만 실행
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    permissions:
-      contents: write        # k8s-manifests 레포에 commit/push하기 위한 권한
-    steps:
-      # HTTPS 대신 SSH를 사용하는 이유: Deploy Key로 k8s-manifests 레포에만 접근 권한을 제한할 수 있어 보안상 유리
-      - name: Set up SSH for k8s-manifests
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.K8S_DEPLOY_KEY }}
-
-      - name: Clone k8s-manifests via SSH
-        run: git clone git@github.com:gusgh075/hw22th-final-team1-k8s-manifest.git k8s-manifests
-
-      # deployments.yaml에서 'name: frontend-service' 줄을 찾고,
-      # 바로 다음 줄(image:)의 태그를 새 run_number로 교체한다
-      - name: Update image tag in deployments.yaml
-        run: |
-          IMAGE_PATH="${{ secrets.DOCKERHUB_USERNAME }}/frontend-service:${{ github.run_number }}"
-          # Secret이 비어있으면 기존 태그를 덮어쓰는 사고를 방지하기 위해 사전 검증
-          if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
-            echo "ERROR: DOCKERHUB_USERNAME secret is empty — aborting to prevent overwriting existing image tag"
-            exit 1
-          fi
-          sed -i "/name: frontend-service/{n; s|image:.*|image: $IMAGE_PATH|}" k8s-manifests/deployments.yaml
-
-      - name: Commit and push changes
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          cd k8s-manifests
-          git remote set-url origin git@github.com:gusgh075/hw22th-final-team1-k8s-manifest.git
-          git add deployments.yaml
-
-          # 이미 동일한 태그가 반영되어 있으면 불필요한 커밋을 생성하지 않고 종료
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-
-          # [skip ci]: k8s-manifests 레포에 자체 CI가 있을 경우 이 커밋으로 인한 무한 루프를 방지
-          git commit -m "chore: update frontend-service tag (run #${{ github.run_number }}) [skip ci]"
-
-          # 여러 서비스 workflow가 동시에 push할 때 git 충돌이 발생할 수 있다.
-          # fetch → rebase로 최신 상태를 맞춘 뒤 push하는 방식으로 충돌을 해소한다.
-          # backoff: 1회 실패 시 2~6초, 2회 실패 시 4~8초 ... 점진적으로 대기 시간 증가
-          pushed=false
-          for i in $(seq 1 10); do
-            git fetch origin main
-            git rebase origin/main
-            git push origin HEAD:main && { pushed=true; break; }
-            echo "Push failed (attempt $i/10), retrying..."
-            sleep $((i * 2 + RANDOM % 5))
-          done
-
-          # 10회 모두 실패하면 워크플로를 명시적으로 실패 처리 (silent 성공 방지)
-          if [ "$pushed" = "false" ]; then
-            echo "ERROR: Failed to push to k8s-manifests after 10 attempts"
-            exit 1
-          fi
+            VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }}
+            VITE_API_PREFIX=${{ env.VITE_API_PREFIX }}
+            VITE_DEMO_USER_PASSWORD=${{ env.VITE_DEMO_USER_PASSWORD }}

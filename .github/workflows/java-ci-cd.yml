@@ -34,9 +34,6 @@ jobs:
   # ────────────────────────────────────────────────
   build-and-push:
     runs-on: ubuntu-latest
-    outputs:
-      # update-k8s job에서 사용할 이미지 경로를 output으로 노출
-      image_path: ${{ steps.set-image.outputs.image_path }}
     steps:
       # 전체 서브모듈을 한꺼번에 clone하면 불필요한 다른 서비스 소스까지 내려받게 된다.
       # 먼저 메인 레포만 체크아웃하고, 아래 단계에서 해당 서비스 서브모듈만 초기화한다.
@@ -88,19 +85,13 @@ jobs:
       #   - latest     : 항상 최신 이미지를 가리키는 alias
       - name: Build and push Docker image
         if: github.ref == 'refs/heads/main' && inputs.use_dockerhub
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./${{ inputs.working_directory }}
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ github.run_number }}
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:latest
-
-      # 다음 job(update-k8s)이 사용할 이미지 경로를 GITHUB_OUTPUT에 저장
-      - name: Set image path output
-        if: github.ref == 'refs/heads/main' && inputs.use_dockerhub
-        id: set-image
-        run: echo "image_path=${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ github.run_number }}" >> $GITHUB_OUTPUT
 
   # ────────────────────────────────────────────────
   # Job 2: k8s-manifests 이미지 태그 업데이트
